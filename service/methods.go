@@ -1,15 +1,14 @@
 package service
 
 import (
-	"encoding/hex"
 	"fmt"
 	"time"
 
 	"github.com/ontio/crossChainClient/common"
 	"github.com/ontio/crossChainClient/log"
-	"github.com/ontio/multi-chain/smartcontract/service/native/cross_chain_manager/inf"
-	ocommon "github.com/ontio/ontology/common"
-	"github.com/ontio/ontology/smartcontract/service/native/cross_chain"
+
+	//"github.com/ontio/multi-chain/smartcontract/service/native/cross_chain_manager/inf"
+
 	"github.com/ontio/ontology/smartcontract/service/native/header_sync"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 )
@@ -33,12 +32,16 @@ func (this *SyncService) GetGasLimit() uint64 {
 }
 
 func (this *SyncService) GetCurrentSideChainSyncHeight(aliaChainID uint64) (uint32, error) {
-	contractAddress := utils.HeaderSyncContractAddress
+	contractAddress := utils.HeaderSyncContractAddress // can be hard coded
+
 	aliaChainIDBytes, err := utils.GetUint64Bytes(aliaChainID)
 	if err != nil {
 		return 0, fmt.Errorf("GetUint32Bytes, get viewBytes error: %s", err)
 	}
+
+	// "currentHeight"+2
 	key := common.ConcatKey([]byte(header_sync.CURRENT_HEIGHT), aliaChainIDBytes)
+
 	value, err := this.sideSdk.ClientMgr.GetStorage(contractAddress.ToHexString(), key)
 	if err != nil {
 		return 0, fmt.Errorf("getStorage error: %s", err)
@@ -101,8 +104,8 @@ func (this *SyncService) syncHeaderToAlia(height uint32) error {
 	return nil
 }
 
-func (this *SyncService) syncProofToAlia(key string, height uint32) error {
-	//TODO: filter if tx is done
+/* func (this *SyncService) syncProofToAlia(key string, height uint32) error {
+	TODO: filter if tx is done
 
 	k, err := hex.DecodeString(key)
 	if err != nil {
@@ -129,7 +132,7 @@ func (this *SyncService) syncProofToAlia(key string, height uint32) error {
 	}
 	log.Infof("[syncProofToAlia] syncProofToAlia txHash is :", txHash.ToHexString())
 	return nil
-}
+} */
 
 func (this *SyncService) syncHeaderToSide(height uint32) error {
 	chainIDBytes, err := utils.GetUint64Bytes(this.GetAliaChainID())
@@ -140,31 +143,37 @@ func (this *SyncService) syncHeaderToSide(height uint32) error {
 	if err != nil {
 		return fmt.Errorf("[syncHeaderToSide] heightBytes, getUint32Bytes error: %v", err)
 	}
+	// 从header_sync合约里去拿对应height高度的值，如果不为0，说明已经同步过了
 	v, err := this.sideSdk.GetStorage(utils.HeaderSyncContractAddress.ToHexString(),
 		common.ConcatKey([]byte(header_sync.HEADER_INDEX), chainIDBytes, heightBytes))
 	if len(v) != 0 {
 		return nil
 	}
-	contractAddress := utils.HeaderSyncContractAddress
-	method := header_sync.SYNC_BLOCK_HEADER
+
+	contractAddress := utils.HeaderSyncContractAddress // can be hard coded
+	method := header_sync.SYNC_BLOCK_HEADER            // can be hard coded
 	block, err := this.aliaSdk.GetBlockByHeight(height)
 	if err != nil {
 		log.Errorf("[syncHeaderToSide] this.mainSdk.GetBlockByHeight error:%s", err)
 	}
+
+	// not sure about &header_sync.SyncBlockHeaderParam
 	param := &header_sync.SyncBlockHeaderParam{
 		Headers: [][]byte{block.Header.ToArray()},
 	}
+	// need to change sdk here!!!
 	txHash, err := this.sideSdk.Native.InvokeNativeContract(this.GetGasPrice(), this.GetGasLimit(), this.account, codeVersion,
 		contractAddress, method, []interface{}{param})
 	if err != nil {
 		return fmt.Errorf("[syncHeaderToSide] invokeNativeContract error: %s", err)
 	}
+
 	log.Infof("[syncHeaderToSide] syncHeaderToSide txHash is :", txHash.ToHexString())
 	this.waitForSideBlock()
 	return nil
 }
 
-func (this *SyncService) syncProofToSide(key string, height uint32) error {
+/* func (this *SyncService) syncProofToSide(key string, height uint32) error {
 	//TODO: filter if tx is done
 
 	k, err := hex.DecodeString(key)
@@ -192,7 +201,7 @@ func (this *SyncService) syncProofToSide(key string, height uint32) error {
 	}
 	log.Infof("[syncProofToSide] syncProofToSide txHash is :", txHash.ToHexString())
 	return nil
-}
+} */
 
 func (this *SyncService) waitForAliaBlock() {
 	_, err := this.aliaSdk.WaitForGenerateBlock(90*time.Second, 3)

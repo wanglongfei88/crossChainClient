@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"encoding/json"
+
 	"github.com/ontio/crossChainClient/config"
 	"github.com/ontio/crossChainClient/log"
 	vconfig "github.com/ontio/multi-chain/consensus/vbft/config"
@@ -36,6 +37,7 @@ func (this *SyncService) Run() {
 }
 
 func (this *SyncService) AllianceToSide() {
+	// 侧链上已经同步的主链高度，存放在智能合约header_sync里
 	currentSideChainSyncHeight, err := this.GetCurrentSideChainSyncHeight(this.GetAliaChainID())
 	if err != nil {
 		log.Errorf("[AllianceToSide] this.GetCurrentSideChainSyncHeight error:", err)
@@ -43,6 +45,7 @@ func (this *SyncService) AllianceToSide() {
 	}
 	this.sideSyncHeight = currentSideChainSyncHeight
 	for {
+		// 当前主链的高度
 		currentMainChainHeight, err := this.aliaSdk.GetCurrentBlockHeight()
 		if err != nil {
 			log.Errorf("[AllianceToSide] this.mainSdk.GetCurrentBlockHeight error:", err)
@@ -54,10 +57,12 @@ func (this *SyncService) AllianceToSide() {
 			if err != nil {
 				log.Errorf("[AllianceToSide] this.mainSdk.GetBlockByHeight error:", err)
 			}
-			blkInfo := &vconfig.VbftBlockInfo{}
+			blkInfo := &vconfig.VbftBlockInfo{} // resolve reference issue
+			// 把block.Header.ConsensusPayload放到blkInfo里面，
 			if err := json.Unmarshal(block.Header.ConsensusPayload, blkInfo); err != nil {
 				log.Errorf("[AllianceToSide] unmarshal blockInfo error: %s", err)
 			}
+			// 说明是key header
 			if blkInfo.NewChainConfig != nil {
 				err = this.syncHeaderToSide(i)
 				if err != nil {
