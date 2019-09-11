@@ -14,66 +14,66 @@ import (
 
 type SyncService struct {
 	account        *sdk.Account
-	aliaSdk        *sdk.OntologySdk
-	aliaSyncHeight uint32
-	sideSdk        *sdk.OntologySdk
-	sideSyncHeight uint32
+	relaySdk        *sdk.OntologySdk
+	relaySyncHeight uint32
+	neoSdk         *sdk.OntologySdk
+	neoSyncHeight  uint32
 	config         *config.Config
 }
 
-func NewSyncService(acct *sdk.Account, aliaSdk *sdk.OntologySdk, sideSdk *sdk.OntologySdk) *SyncService {
+func NewSyncService(acct *sdk.Account, relaySdk *sdk.OntologySdk, neoSdk *sdk.OntologySdk) *SyncService {
 	syncSvr := &SyncService{
 		account: acct,
-		aliaSdk: aliaSdk,
-		sideSdk: sideSdk,
+		relaySdk: relaySdk,
+		neoSdk:  neoSdk,
 		config:  config.DefConfig,
 	}
 	return syncSvr
 }
 
 func (this *SyncService) Run() {
-	go this.SideToAlliance()
-	go this.AllianceToSide()
+	go this.NeoToAlliance()
+	//go this.AllianceToNeo()
 }
 
-func (this *SyncService) AllianceToSide() {
+func (this *SyncService) AllianceToNeo() {
 	// 侧链上已经同步的主链高度，存放在智能合约header_sync里
-	currentSideChainSyncHeight, err := this.GetCurrentSideChainSyncHeight(this.GetAliaChainID())
+	currentNeoChainSyncHeight, err := this.GetCurrentNeoChainSyncHeight(this.GetRelayChainID())
 	if err != nil {
-		log.Errorf("[AllianceToSide] this.GetCurrentSideChainSyncHeight error:", err)
+		log.Errorf("[AllianceToNeo] this.GetCurrentNeoChainSyncHeight error:", err)
 		os.Exit(1)
 	}
-	this.sideSyncHeight = currentSideChainSyncHeight
+	this.neoSyncHeight = currentNeoChainSyncHeight
 	for {
 		// 当前主链的高度
-		currentMainChainHeight, err := this.aliaSdk.GetCurrentBlockHeight()
+		currentMainChainHeight, err := this.relaySdk.GetCurrentBlockHeight()
 		if err != nil {
-			log.Errorf("[AllianceToSide] this.mainSdk.GetCurrentBlockHeight error:", err)
+			log.Errorf("[AllianceToNeo] this.mainSdk.GetCurrentBlockHeight error:", err)
 		}
-		for i := this.sideSyncHeight; i < currentMainChainHeight; i++ {
-			log.Infof("[AllianceToSide] start parse block %d", i)
+		for i := this.neoSyncHeight; i < currentMainChainHeight; i++ {
+			log.Infof("[AllianceToNeo] start parse block %d", i)
 			//sync key header
-			block, err := this.aliaSdk.GetBlockByHeight(i)
+			block, err := this.relaySdk.GetBlockByHeight(i)
 			if err != nil {
-				log.Errorf("[AllianceToSide] this.mainSdk.GetBlockByHeight error:", err)
+				log.Errorf("[AllianceToNeo] this.mainSdk.GetBlockByHeight error:", err)
 			}
 			blkInfo := &vconfig.VbftBlockInfo{} // resolve reference issue
 			// 把block.Header.ConsensusPayload放到blkInfo里面，
 			if err := json.Unmarshal(block.Header.ConsensusPayload, blkInfo); err != nil {
-				log.Errorf("[AllianceToSide] unmarshal blockInfo error: %s", err)
+				log.Errorf("[AllianceToNeo] unmarshal blockInfo error: %s", err)
 			}
 			// 说明是key header
 			if blkInfo.NewChainConfig != nil {
-				err = this.syncHeaderToSide(i)
+				err = this.syncHeaderToNeo(i)
 				if err != nil {
-					log.Errorf("[AllianceToSide] this.syncHeaderToSide error:%s", err)
+					log.Errorf("[AllianceToNeo] this.syncHeaderToNeo error:%s", err)
 				}
 			}
 
 			//sync cross chain info
-			events, err := this.aliaSdk.GetSmartContractEventByBlock(i)
+			events, err := this.relaySdk.GetSmartContractEventByBlock(i)
 			if err != nil {
-				log.Errorf("[AllianceToSide] this.aliaSdk.GetSmartContractEventByBlock error:%s", err)
+				log.Errorf("[AllianceToNeo] this.relaySdk.GetSmartContractEventByBlock error:%s", err)
 				break
 			}
 			for _, event := range events {
@@ -85,56 +85,56 @@ func (this *SyncService) AllianceToSide() {
 					name := states[0].(string)
 					if name == ont.MAKE_TO_ONT_PROOF {
 						key := states[3].(string)
-						err = this.syncHeaderToSide(i + 1)
+						err = this.syncHeaderToNeo(i + 1)
 						if err != nil {
-							log.Errorf("[AllianceToSide] this.syncHeaderToSide error:%s", err)
+							log.Errorf("[AllianceToNeo] this.syncHeaderToNeo error:%s", err)
 						}
-						err := this.syncProofToSide(key, i)
+						err := this.syncProofToNeo(key, i)
 						if err != nil {
-							log.Errorf("[AllianceToSide] this.syncProofToSide error:%s", err)
+							log.Errorf("[AllianceToNeo] this.syncProofToNeo error:%s", err)
 						}
 					}
 				}
 			}
-			this.sideSyncHeight++
+			this.neoSyncHeight++
 		}
 	}
 }
 
-func (this *SyncService) SideToAlliance() {
-	currentAliaChainSyncHeight, err := this.GetCurrentAliaChainSyncHeight(this.GetSideChainID())
+func (this *SyncService) NeoToAlliance() {
+	currentRelayChainSyncHeight, err := this.GetCurrentRelayChainSyncHeight(this.GetNeoChainID())
 	if err != nil {
-		log.Errorf("[SideToAlliance] this.GetCurrentMainChainSyncHeight error:", err)
+		log.Errorf("[NeoToAlliance] this.GetCurrentMainChainSyncHeight error:", err)
 		os.Exit(1)
 	}
-	this.aliaSyncHeight = currentAliaChainSyncHeight
+	this.relaySyncHeight = currentRelayChainSyncHeight
 	for {
-		currentSideChainHeight, err := this.sideSdk.GetCurrentBlockHeight()
+		currentNeoChainHeight, err := this.neoSdk.GetCurrentBlockHeight()
 		if err != nil {
-			log.Errorf("[SideToAlliance] this.sideSdk.GetCurrentBlockHeight error:", err)
+			log.Errorf("[NeoToAlliance] this.neoSdk.GetCurrentBlockHeight error:", err)
 		}
-		for i := this.aliaSyncHeight; i < currentSideChainHeight; i++ {
-			log.Infof("[SideToAlliance] start parse block %d", i)
+		for i := this.relaySyncHeight; i < currentNeoChainHeight; i++ {
+			log.Infof("[NeoToAlliance] start parse block %d", i)
 			//sync key header
-			block, err := this.sideSdk.GetBlockByHeight(i)
+			block, err := this.neoSdk.GetBlockByHeight(i)
 			if err != nil {
-				log.Errorf("[SideToAlliance] this.mainSdk.GetBlockByHeight error:", err)
+				log.Errorf("[NeoToAlliance] this.mainSdk.GetBlockByHeight error:", err)
 			}
 			blkInfo := &vconfig.VbftBlockInfo{}
 			if err := json.Unmarshal(block.Header.ConsensusPayload, blkInfo); err != nil {
-				log.Errorf("[SideToAlliance] unmarshal blockInfo error: %s", err)
+				log.Errorf("[NeoToAlliance] unmarshal blockInfo error: %s", err)
 			}
 			if blkInfo.NewChainConfig != nil {
-				err = this.syncHeaderToAlia(i)
+				err = this.syncHeaderToRelay(i)
 				if err != nil {
-					log.Errorf("[SideToAlliance] this.syncHeaderToMain error:%s", err)
+					log.Errorf("[NeoToAlliance] this.syncHeaderToMain error:%s", err)
 				}
 			}
 
 			//sync cross chain info
-			events, err := this.sideSdk.GetSmartContractEventByBlock(i)
+			events, err := this.neoSdk.GetSmartContractEventByBlock(i)
 			if err != nil {
-				log.Errorf("[SideToAlliance] this.sideSdk.GetSmartContractEventByBlock error:%s", err)
+				log.Errorf("[NeoToAlliance] this.neoSdk.GetSmartContractEventByBlock error:%s", err)
 				break
 			}
 			for _, event := range events {
@@ -146,18 +146,18 @@ func (this *SyncService) SideToAlliance() {
 					name := states[0].(string)
 					if name == ont.MAKE_FROM_ONT_PROOF {
 						key := states[3].(string)
-						err = this.syncHeaderToAlia(i + 1)
+						err = this.syncHeaderToRelay(i + 1)
 						if err != nil {
-							log.Errorf("[SideToAlliance] this.syncHeaderToAlia error:%s", err)
+							log.Errorf("[NeoToAlliance] this.syncHeaderToRelay error:%s", err)
 						}
-						err := this.syncProofToAlia(key, i)
+						err := this.syncProofToRelay(key, i)
 						if err != nil {
-							log.Errorf("[SideToAlliance] this.syncProofToAlia error:%s", err)
+							log.Errorf("[NeoToAlliance] this.syncProofToRelay error:%s", err)
 						}
 					}
 				}
 			}
-			this.aliaSyncHeight++
+			this.relaySyncHeight++
 		}
 	}
 

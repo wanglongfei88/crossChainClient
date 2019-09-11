@@ -50,17 +50,22 @@ func startSync(ctx *cli.Context) {
 		return
 	}
 
-	aliaSdk := sdk.NewOntologySdk()
-	aliaSdk.NewRpcClient().SetAddress(config.DefConfig.AliaJsonRpcAddress)
-	sideSdk := sdk.NewOntologySdk()
-	sideSdk.NewRpcClient().SetAddress(config.DefConfig.SideJsonRpcAddress)
-	account, ok := common.GetAccountByPassword(aliaSdk, config.DefConfig.WalletFile)
+	//create Relay Chain RPC Client
+	relaySdk := sdk.NewOntologySdk()
+	relaySdk.NewRpcClient().SetAddress(config.DefConfig.RelayJsonRpcAddress)
+
+	//Get wallet account from Relay Chain
+	account, ok := common.GetAccountByPassword(relaySdk, config.DefConfig.WalletFile)
 	if !ok {
 		fmt.Println("common.GetAccountByPassword error")
 		return
 	}
 
-	syncService := service.NewSyncService(account, aliaSdk, sideSdk)
+	//create NEO RPC client
+	neoSdk := sdk.NewOntologySdk()
+	neoSdk.NewRpcClient().SetAddress(config.DefConfig.NeoJsonRpcAddress)
+
+	syncService := service.NewSyncService(account, relaySdk, neoSdk)
 	syncService.Run()
 
 	waitToExit()

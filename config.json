@@ -1,8 +1,8 @@
 {
-  "AliaJsonRpcAddress":"http://172.168.3.73:40336",
-  "SideJsonRpcAddress":"TBD",
-  "AliaChainID": 2,
-  "SideChainID": 3,
+  "RelayJsonRpcAddress":"http://172.168.3.73:40336",
+  "NeoJsonRpcAddress":"TBD",
+  "RelayChainID": 2,
+  "NeoChainID": 3,
   "WalletFile":"./wallet.dat",
   "GasPrice":0,
   "GasLimit":200000

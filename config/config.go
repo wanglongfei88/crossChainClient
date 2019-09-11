@@ -17,10 +17,10 @@ var DefConfig = NewConfig()
 
 //Config object used by ontology-instance
 type Config struct {
-	AliaJsonRpcAddress string
-	SideJsonRpcAddress string
-	AliaChainID        uint64
-	SideChainID        uint64
+	RelayJsonRpcAddress string
+	NeoJsonRpcAddress  string
+	RelayChainID        uint64
+	NeoChainID         uint64
 	WalletFile         string
 	GasPrice           uint64
 	GasLimit           uint64

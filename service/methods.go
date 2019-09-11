@@ -9,18 +9,19 @@ import (
 
 	//"github.com/ontio/multi-chain/smartcontract/service/native/cross_chain_manager/inf"
 
-	"github.com/ontio/ontology/smartcontract/service/native/header_sync"
+	//"github.com/ontio/ontology/smartcontract/service/native/header_sync"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
+	"github.com/siovanus/ontology/smartcontract/service/native/header_sync"
 )
 
 var codeVersion = byte(0)
 
-func (this *SyncService) GetAliaChainID() uint64 {
-	return this.config.AliaChainID
+func (this *SyncService) GetRelayChainID() uint64 {
+	return this.config.RelayChainID
 }
 
-func (this *SyncService) GetSideChainID() uint64 {
-	return this.config.SideChainID
+func (this *SyncService) GetNeoChainID() uint64 {
+	return this.config.NeoChainID
 }
 
 func (this *SyncService) GetGasPrice() uint64 {
@@ -31,18 +32,18 @@ func (this *SyncService) GetGasLimit() uint64 {
 	return this.config.GasLimit
 }
 
-func (this *SyncService) GetCurrentSideChainSyncHeight(aliaChainID uint64) (uint32, error) {
+func (this *SyncService) GetCurrentNeoChainSyncHeight(relayChainID uint64) (uint32, error) {
 	contractAddress := utils.HeaderSyncContractAddress // can be hard coded
 
-	aliaChainIDBytes, err := utils.GetUint64Bytes(aliaChainID)
+	relayChainIDBytes, err := utils.GetUint64Bytes(relayChainID)
 	if err != nil {
 		return 0, fmt.Errorf("GetUint32Bytes, get viewBytes error: %s", err)
 	}
 
 	// "currentHeight"+2
-	key := common.ConcatKey([]byte(header_sync.CURRENT_HEIGHT), aliaChainIDBytes)
+	key := common.ConcatKey([]byte(header_sync.CURRENT_HEIGHT), relayChainIDBytes)
 
-	value, err := this.sideSdk.ClientMgr.GetStorage(contractAddress.ToHexString(), key)
+	value, err := this.neoSdk.ClientMgr.GetStorage(contractAddress.ToHexString(), key)
 	if err != nil {
 		return 0, fmt.Errorf("getStorage error: %s", err)
 	}
@@ -53,14 +54,14 @@ func (this *SyncService) GetCurrentSideChainSyncHeight(aliaChainID uint64) (uint
 	return height, nil
 }
 
-func (this *SyncService) GetCurrentAliaChainSyncHeight(sideChainID uint64) (uint32, error) {
+func (this *SyncService) GetCurrentRelayChainSyncHeight(neoChainID uint64) (uint32, error) {
 	contractAddress := utils.HeaderSyncContractAddress
-	sideChainIDBytes, err := utils.GetUint64Bytes(sideChainID)
+	neoChainIDBytes, err := utils.GetUint64Bytes(neoChainID)
 	if err != nil {
 		return 0, fmt.Errorf("GetUint32Bytes, get viewBytes error: %s", err)
 	}
-	key := common.ConcatKey([]byte(header_sync.CURRENT_HEIGHT), sideChainIDBytes)
-	value, err := this.aliaSdk.ClientMgr.GetStorage(contractAddress.ToHexString(), key)
+	key := common.ConcatKey([]byte(header_sync.CURRENT_HEIGHT), neoChainIDBytes)
+	value, err := this.relaySdk.ClientMgr.GetStorage(contractAddress.ToHexString(), key)
 	if err != nil {
 		return 0, fmt.Errorf("getStorage error: %s", err)
 	}
@@ -71,80 +72,80 @@ func (this *SyncService) GetCurrentAliaChainSyncHeight(sideChainID uint64) (uint
 	return height, nil
 }
 
-func (this *SyncService) syncHeaderToAlia(height uint32) error {
-	chainIDBytes, err := utils.GetUint64Bytes(this.GetSideChainID())
+func (this *SyncService) syncHeaderToRelay(height uint32) error {
+	chainIDBytes, err := utils.GetUint64Bytes(this.GetNeoChainID())
 	if err != nil {
-		return fmt.Errorf("[syncHeaderToAlia] chainIDBytes, getUint32Bytes error: %v", err)
+		return fmt.Errorf("[syncHeaderToRelay] chainIDBytes, getUint32Bytes error: %v", err)
 	}
 	heightBytes, err := utils.GetUint32Bytes(height)
 	if err != nil {
-		return fmt.Errorf("[syncHeaderToAlia] heightBytes, getUint32Bytes error: %v", err)
+		return fmt.Errorf("[syncHeaderToRelay] heightBytes, getUint32Bytes error: %v", err)
 	}
-	v, err := this.aliaSdk.GetStorage(utils.HeaderSyncContractAddress.ToHexString(),
+	v, err := this.relaySdk.GetStorage(utils.HeaderSyncContractAddress.ToHexString(),
 		common.ConcatKey([]byte(header_sync.HEADER_INDEX), chainIDBytes, heightBytes))
 	if len(v) != 0 {
 		return nil
 	}
 	contractAddress := utils.HeaderSyncContractAddress
 	method := header_sync.SYNC_BLOCK_HEADER
-	block, err := this.sideSdk.GetBlockByHeight(height)
+	block, err := this.neoSdk.GetBlockByHeight(height)
 	if err != nil {
-		log.Errorf("[syncHeaderToAlia] this.mainSdk.GetBlockByHeight error:%s", err)
+		log.Errorf("[syncHeaderToRelay] this.mainSdk.GetBlockByHeight error:%s", err)
 	}
 	param := &header_sync.SyncBlockHeaderParam{
 		Headers: [][]byte{block.Header.ToArray()},
 	}
-	txHash, err := this.aliaSdk.Native.InvokeNativeContract(this.GetGasPrice(), this.GetGasLimit(), this.account, codeVersion,
+	txHash, err := this.relaySdk.Native.InvokeNativeContract(this.GetGasPrice(), this.GetGasLimit(), this.account, codeVersion,
 		contractAddress, method, []interface{}{param})
 	if err != nil {
-		return fmt.Errorf("[syncHeaderToAlia] invokeNativeContract error: %s", err)
+		return fmt.Errorf("[syncHeaderToRelay] invokeNativeContract error: %s", err)
 	}
-	log.Infof("[syncHeaderToAlia] syncHeaderToAlia txHash is :", txHash.ToHexString())
-	this.waitForAliaBlock()
+	log.Infof("[syncHeaderToRelay] syncHeaderToRelay txHash is :", txHash.ToHexString())
+	this.waitForRelayBlock()
 	return nil
 }
 
-/* func (this *SyncService) syncProofToAlia(key string, height uint32) error {
+/* func (this *SyncService) syncProofToRelay(key string, height uint32) error {
 	TODO: filter if tx is done
 
 	k, err := hex.DecodeString(key)
 	if err != nil {
-		return fmt.Errorf("[syncProofToAlia] hex.DecodeString error: %s", err)
+		return fmt.Errorf("[syncProofToRelay] hex.DecodeString error: %s", err)
 	}
-	proof, err := this.sideSdk.GetCrossStatesProof(height, k)
+	proof, err := this.neoSdk.GetCrossStatesProof(height, k)
 	if err != nil {
-		return fmt.Errorf("[syncProofToAlia] this.sideSdk.GetCrossStatesProof error: %s", err)
+		return fmt.Errorf("[syncProofToRelay] this.neoSdk.GetCrossStatesProof error: %s", err)
 	}
 
 	contractAddress, _ := ocommon.AddressParseFromBytes([]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10})
 	method := "ImportOuterTransfer"
 	param := &inf.EntranceParam{
-		SourceChainID:  this.GetSideChainID(),
+		SourceChainID:  this.GetNeoChainID(),
 		Height:         height + 1,
 		Proof:          proof.AuditPath,
 		RelayerAddress: this.account.Address.ToBase58(),
-		TargetChainID:  this.GetAliaChainID(),
+		TargetChainID:  this.GetRelayChainID(),
 	}
-	txHash, err := this.aliaSdk.Native.InvokeNativeContract(this.GetGasPrice(), this.GetGasLimit(), this.account, codeVersion,
+	txHash, err := this.relaySdk.Native.InvokeNativeContract(this.GetGasPrice(), this.GetGasLimit(), this.account, codeVersion,
 		contractAddress, method, []interface{}{param})
 	if err != nil {
-		return fmt.Errorf("[syncProofToAlia] invokeNativeContract error: %s", err)
+		return fmt.Errorf("[syncProofToRelay] invokeNativeContract error: %s", err)
 	}
-	log.Infof("[syncProofToAlia] syncProofToAlia txHash is :", txHash.ToHexString())
+	log.Infof("[syncProofToRelay] syncProofToRelay txHash is :", txHash.ToHexString())
 	return nil
 } */
 
-func (this *SyncService) syncHeaderToSide(height uint32) error {
-	chainIDBytes, err := utils.GetUint64Bytes(this.GetAliaChainID())
+func (this *SyncService) syncHeaderToNeo(height uint32) error {
+	chainIDBytes, err := utils.GetUint64Bytes(this.GetRelayChainID())
 	if err != nil {
-		return fmt.Errorf("[syncHeaderToSide] chainIDBytes, getUint32Bytes error: %v", err)
+		return fmt.Errorf("[syncHeaderToNeo] chainIDBytes, getUint32Bytes error: %v", err)
 	}
 	heightBytes, err := utils.GetUint32Bytes(height)
 	if err != nil {
-		return fmt.Errorf("[syncHeaderToSide] heightBytes, getUint32Bytes error: %v", err)
+		return fmt.Errorf("[syncHeaderToNeo] heightBytes, getUint32Bytes error: %v", err)
 	}
 	// 从header_sync合约里去拿对应height高度的值，如果不为0，说明已经同步过了
-	v, err := this.sideSdk.GetStorage(utils.HeaderSyncContractAddress.ToHexString(),
+	v, err := this.neoSdk.GetStorage(utils.HeaderSyncContractAddress.ToHexString(),
 		common.ConcatKey([]byte(header_sync.HEADER_INDEX), chainIDBytes, heightBytes))
 	if len(v) != 0 {
 		return nil
@@ -152,9 +153,9 @@ func (this *SyncService) syncHeaderToSide(height uint32) error {
 
 	contractAddress := utils.HeaderSyncContractAddress // can be hard coded
 	method := header_sync.SYNC_BLOCK_HEADER            // can be hard coded
-	block, err := this.aliaSdk.GetBlockByHeight(height)
+	block, err := this.relaySdk.GetBlockByHeight(height)
 	if err != nil {
-		log.Errorf("[syncHeaderToSide] this.mainSdk.GetBlockByHeight error:%s", err)
+		log.Errorf("[syncHeaderToNeo] this.mainSdk.GetBlockByHeight error:%s", err)
 	}
 
 	// not sure about &header_sync.SyncBlockHeaderParam
@@ -162,27 +163,27 @@ func (this *SyncService) syncHeaderToSide(height uint32) error {
 		Headers: [][]byte{block.Header.ToArray()},
 	}
 	// need to change sdk here!!!
-	txHash, err := this.sideSdk.Native.InvokeNativeContract(this.GetGasPrice(), this.GetGasLimit(), this.account, codeVersion,
+	txHash, err := this.neoSdk.Native.InvokeNativeContract(this.GetGasPrice(), this.GetGasLimit(), this.account, codeVersion,
 		contractAddress, method, []interface{}{param})
 	if err != nil {
-		return fmt.Errorf("[syncHeaderToSide] invokeNativeContract error: %s", err)
+		return fmt.Errorf("[syncHeaderToNeo] invokeNativeContract error: %s", err)
 	}
 
-	log.Infof("[syncHeaderToSide] syncHeaderToSide txHash is :", txHash.ToHexString())
-	this.waitForSideBlock()
+	log.Infof("[syncHeaderToNeo] syncHeaderToNeo txHash is :", txHash.ToHexString())
+	this.waitForNeoBlock()
 	return nil
 }
 
-/* func (this *SyncService) syncProofToSide(key string, height uint32) error {
+/* func (this *SyncService) syncProofToNeo(key string, height uint32) error {
 	//TODO: filter if tx is done
 
 	k, err := hex.DecodeString(key)
 	if err != nil {
-		return fmt.Errorf("[syncProofToSide] hex.DecodeString error: %s", err)
+		return fmt.Errorf("[syncProofToNeo] hex.DecodeString error: %s", err)
 	}
-	proof, err := this.aliaSdk.GetCrossStatesProof(height, k)
+	proof, err := this.relaySdk.GetCrossStatesProof(height, k)
 	if err != nil {
-		return fmt.Errorf("[syncProofToSide] this.sideSdk.GetMptProof error: %s", err)
+		return fmt.Errorf("[syncProofToNeo] this.neoSdk.GetMptProof error: %s", err)
 	}
 
 	crossChainAddress, _ := ocommon.AddressParseFromBytes([]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08})
@@ -190,29 +191,29 @@ func (this *SyncService) syncHeaderToSide(height uint32) error {
 	method := cross_chain.PROCESS_CROSS_CHAIN_TX
 	param := &cross_chain.ProcessCrossChainTxParam{
 		Address:     this.account.Address,
-		FromChainID: this.GetAliaChainID(),
+		FromChainID: this.GetRelayChainID(),
 		Height:      height + 1,
 		Proof:       proof.AuditPath,
 	}
-	txHash, err := this.sideSdk.Native.InvokeNativeContract(this.GetGasPrice(), this.GetGasLimit(), this.account, codeVersion,
+	txHash, err := this.neoSdk.Native.InvokeNativeContract(this.GetGasPrice(), this.GetGasLimit(), this.account, codeVersion,
 		contractAddress, method, []interface{}{param})
 	if err != nil {
-		return fmt.Errorf("[syncProofToSide] invokeNativeContract error: %s", err)
+		return fmt.Errorf("[syncProofToNeo] invokeNativeContract error: %s", err)
 	}
-	log.Infof("[syncProofToSide] syncProofToSide txHash is :", txHash.ToHexString())
+	log.Infof("[syncProofToNeo] syncProofToNeo txHash is :", txHash.ToHexString())
 	return nil
 } */
 
-func (this *SyncService) waitForAliaBlock() {
-	_, err := this.aliaSdk.WaitForGenerateBlock(90*time.Second, 3)
+func (this *SyncService) waitForRelayBlock() {
+	_, err := this.relaySdk.WaitForGenerateBlock(90*time.Second, 3)
 	if err != nil {
-		log.Errorf("waitForAliaBlock error:%s", err)
+		log.Errorf("waitForRelayBlock error:%s", err)
 	}
 }
 
-func (this *SyncService) waitForSideBlock() {
-	_, err := this.sideSdk.WaitForGenerateBlock(90*time.Second, 3)
+func (this *SyncService) waitForNeoBlock() {
+	_, err := this.neoSdk.WaitForGenerateBlock(90*time.Second, 3)
 	if err != nil {
-		log.Errorf("waitForSideBlock error:%s", err)
+		log.Errorf("waitForNeoBlock error:%s", err)
 	}
 }
