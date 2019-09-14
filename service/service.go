@@ -7,26 +7,30 @@ import (
 
 	"github.com/ontio/crossChainClient/config"
 	"github.com/ontio/crossChainClient/log"
-	vconfig "github.com/ontio/multi-chain/consensus/vbft/config"
-	"github.com/ontio/multi-chain/smartcontract/service/native/cross_chain_manager/ont"
+
+	//vconfig "github.com/ontio/multi-chain/consensus/vbft/config"
+	//"github.com/ontio/multi-chain/smartcontract/service/native/cross_chain_manager/ont"
+	"github.com/joeqian10/neo-utils/neoutils"
+	neoRpc "github.com/joeqian10/neo-utils/neoutils/neorpc"
 	sdk "github.com/ontio/ontology-go-sdk"
 )
 
 type SyncService struct {
-	account        *sdk.Account
+	account         *sdk.Account
 	relaySdk        *sdk.OntologySdk
 	relaySyncHeight uint32
-	neoSdk         *sdk.OntologySdk
-	neoSyncHeight  uint32
-	config         *config.Config
+	neoWallet	  	*neoutils.neoWallet
+	neoRpcClient    *neoRpc.NEORPCClient
+	neoSyncHeight   uint32
+	config          *config.Config
 }
 
-func NewSyncService(acct *sdk.Account, relaySdk *sdk.OntologySdk, neoSdk *sdk.OntologySdk) *SyncService {
+func NewSyncService(acct *sdk.Account, relaySdk *sdk.OntologySdk, neoRpcClient *neoRpc.NEORPCClient) *SyncService {
 	syncSvr := &SyncService{
-		account: acct,
-		relaySdk: relaySdk,
-		neoSdk:  neoSdk,
-		config:  config.DefConfig,
+		account:      acct,
+		relaySdk:     relaySdk,
+		neoRpcClient: neoRpcClient,
+		config:       config.DefConfig,
 	}
 	return syncSvr
 }
@@ -71,6 +75,9 @@ func (this *SyncService) AllianceToNeo() {
 			}
 
 			//sync cross chain info
+			//sync cross chain info (transactions)
+			// 跨链交易的标记是通过智能合约的event通知来实现的
+			// 看neo-go有没有类似的方法
 			events, err := this.relaySdk.GetSmartContractEventByBlock(i)
 			if err != nil {
 				log.Errorf("[AllianceToNeo] this.relaySdk.GetSmartContractEventByBlock error:%s", err)
@@ -78,14 +85,15 @@ func (this *SyncService) AllianceToNeo() {
 			}
 			for _, event := range events {
 				for _, notify := range event.Notify {
-					states, ok := notify.States.([]interface{})
+					states, ok := notify.States.([]interface{}) // notify.States是interface类型的，类似于C#中object
 					if !ok {
 						continue
 					}
 					name := states[0].(string)
+					// states的数据结构
 					if name == ont.MAKE_TO_ONT_PROOF {
 						key := states[3].(string)
-						err = this.syncHeaderToNeo(i + 1)
+						err = this.syncHeaderToNeo(i + 1) // 跨链交易发生在n个区块，state root是在n+1个区块里面的
 						if err != nil {
 							log.Errorf("[AllianceToNeo] this.syncHeaderToNeo error:%s", err)
 						}

@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"time"
+	"math"
 
 	"github.com/ontio/crossChainClient/common"
 	"github.com/ontio/crossChainClient/log"
@@ -12,6 +13,10 @@ import (
 	//"github.com/ontio/ontology/smartcontract/service/native/header_sync"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 	"github.com/siovanus/ontology/smartcontract/service/native/header_sync"
+
+	"github.com/joeqian10/neo-utils/neoutils"
+	"github.com/joeqian10/neo-utils/neoutils/smartcontract"
+	"github.com/joeqian10/neo-utils/neoutils/tx"
 )
 
 var codeVersion = byte(0)
@@ -144,32 +149,63 @@ func (this *SyncService) syncHeaderToNeo(height uint32) error {
 	if err != nil {
 		return fmt.Errorf("[syncHeaderToNeo] heightBytes, getUint32Bytes error: %v", err)
 	}
-	// 从header_sync合约里去拿对应height高度的值，如果不为0，说明已经同步过了
-	v, err := this.neoSdk.GetStorage(utils.HeaderSyncContractAddress.ToHexString(),
-		common.ConcatKey([]byte(header_sync.HEADER_INDEX), chainIDBytes, heightBytes))
-	if len(v) != 0 {
+
+	// 从header_sync合约里去拿对应height高度的值，如果返回值的长度不为0，说明已经同步过了
+	neoHeaderSyncContractScriptHash := "TBD"
+	headerIndex := "headerIndex"
+	r := this.neoRpcClient.GetStorage(neoHeaderSyncContractScriptHash,
+		common.ConcatKey([]byte(headerIndex), chainIDBytes, heightBytes))
+	// r.Result is a string
+	if len(r.Result) != 0 {
 		return nil
 	}
 
 	contractAddress := utils.HeaderSyncContractAddress // can be hard coded
-	method := header_sync.SYNC_BLOCK_HEADER            // can be hard coded
+	syncBlockHeader := "syncBlockHeader"               // can be hard coded
 	block, err := this.relaySdk.GetBlockByHeight(height)
 	if err != nil {
 		log.Errorf("[syncHeaderToNeo] this.mainSdk.GetBlockByHeight error:%s", err)
 	}
 
-	// not sure about &header_sync.SyncBlockHeaderParam
+	// header_sync.SyncBlockHeaderParam待定
 	param := &header_sync.SyncBlockHeaderParam{
 		Headers: [][]byte{block.Header.ToArray()},
 	}
+
 	// need to change sdk here!!!
-	txHash, err := this.neoSdk.Native.InvokeNativeContract(this.GetGasPrice(), this.GetGasLimit(), this.account, codeVersion,
-		contractAddress, method, []interface{}{param})
-	if err != nil {
-		return fmt.Errorf("[syncHeaderToNeo] invokeNativeContract error: %s", err)
+	// example: SendRawTransaction来构造一笔InvocationTransaction
+	// create an InvocationTransaction
+	itx := tx.CreateInvocationTransaction()
+	// build script
+	scriptBuilder := smartcontract.NewScriptBuilder()
+	script := scriptBuilder.GenerateContractInvocationScript(neoHeaderSyncContractScriptHash, syncBlockHeader, []interface{ param })
+	// invoke script to get gas consumed
+	response := this.neoRpcClient.InvokeScript(bytesToHex(script))
+	gasString := ConvertString(response.Result.GasConsumed)
+	// fulfill the transaction
+	itx.ExtraData.Script = script
+	itx.ExtraData.ScriptLength = len(script)
+	itx.ExtraData.GasConsumed = uint64(gasString)
+	// sign the transaction
+	unsignedRaw := itx.UnsignedRawTransaction()
+	signedData, err := Sign(unsignedRaw, bytesToHex(neoWallet.PrivateKey))
+	if (err != nil) {
+		return fmt.Errorf("[syncHeaderToNeo] Sign error: %s", err)
+	}
+	signature := smartcontract.TransactionSignature{
+		SignedData: signedData,
+		PublicKey:  neoWallet.PublicKey,
+	}
+	scripts := []interface{}{signature}
+	txScripts := smartcontract.NewScriptBuilder().GenerateVerificationScripts(scripts)
+	itx.witness = txScripts
+	// send the raw transaction
+	response := this.neoRpcClient.SendRawTransaction(tx.RawTransactionString())
+	if (response.Result != true) {
+		return fmt.Errorf("[syncHeaderToNeo] SendRawTransaction error: %s", response.ErrorResponse.Message)
 	}
 
-	log.Infof("[syncHeaderToNeo] syncHeaderToNeo txHash is :", txHash.ToHexString())
+	log.Infof("[syncHeaderToNeo] syncHeaderToNeo txHash is :", itx.TXID())
 	this.waitForNeoBlock()
 	return nil
 }
