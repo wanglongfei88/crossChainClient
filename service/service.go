@@ -19,9 +19,11 @@ type SyncService struct {
 	account         *sdk.Account
 	relaySdk        *sdk.OntologySdk
 	relaySyncHeight uint32
+
 	neoWallet	  	*neoutils.neoWallet
 	neoRpcClient    *neoRpc.NEORPCClient
 	neoSyncHeight   uint32
+
 	config          *config.Config
 }
 
@@ -77,7 +79,6 @@ func (this *SyncService) AllianceToNeo() {
 			//sync cross chain info
 			//sync cross chain info (transactions)
 			// 跨链交易的标记是通过智能合约的event通知来实现的
-			// 看neo-go有没有类似的方法
 			events, err := this.relaySdk.GetSmartContractEventByBlock(i)
 			if err != nil {
 				log.Errorf("[AllianceToNeo] this.relaySdk.GetSmartContractEventByBlock error:%s", err)
@@ -124,7 +125,12 @@ func (this *SyncService) NeoToAlliance() {
 		for i := this.relaySyncHeight; i < currentNeoChainHeight; i++ {
 			log.Infof("[NeoToAlliance] start parse block %d", i)
 			//sync key header
-			block, err := this.neoSdk.GetBlockByHeight(i)
+			blockResponse := this.neoRpcClient.GetBlockByIndex(i)
+			// 从blockResponse里构造一个block
+
+			// 检查block的nextConsensus有没有变化
+
+			// 若有变化，就是key header，调用syncHeaderToRelay
 			if err != nil {
 				log.Errorf("[NeoToAlliance] this.mainSdk.GetBlockByHeight error:", err)
 			}
@@ -139,7 +145,17 @@ func (this *SyncService) NeoToAlliance() {
 				}
 			}
 
-			//sync cross chain info
+			// sync cross chain info
+			// get all transactions from this block i
+
+			// for each transaction txID, call GetApplicationLog
+
+			// 在appLogResponse的notifications字段中的contract字段表示的就是合约脚本哈希
+
+			// 只需要判断该脚本哈希是否和CCMC的脚本哈希一致即可
+			appLogResponse := this.neoRpcClient.GetApplicationLog()
+
+
 			events, err := this.neoSdk.GetSmartContractEventByBlock(i)
 			if err != nil {
 				log.Errorf("[NeoToAlliance] this.neoSdk.GetSmartContractEventByBlock error:%s", err)

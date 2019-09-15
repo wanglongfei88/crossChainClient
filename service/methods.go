@@ -37,6 +37,7 @@ func (this *SyncService) GetGasLimit() uint64 {
 	return this.config.GasLimit
 }
 
+// GetCurrentNeoChainSyncHeight 在侧链的智能合约存储区得到已同步过来的中继链高度
 func (this *SyncService) GetCurrentNeoChainSyncHeight(relayChainID uint64) (uint32, error) {
 	contractAddress := utils.HeaderSyncContractAddress // can be hard coded
 
@@ -45,7 +46,7 @@ func (this *SyncService) GetCurrentNeoChainSyncHeight(relayChainID uint64) (uint
 		return 0, fmt.Errorf("GetUint32Bytes, get viewBytes error: %s", err)
 	}
 
-	// "currentHeight"+2
+	// "currentHeight"+"2"
 	key := common.ConcatKey([]byte(header_sync.CURRENT_HEIGHT), relayChainIDBytes)
 
 	value, err := this.neoSdk.ClientMgr.GetStorage(contractAddress.ToHexString(), key)
@@ -59,6 +60,7 @@ func (this *SyncService) GetCurrentNeoChainSyncHeight(relayChainID uint64) (uint
 	return height, nil
 }
 
+// GetCurrentRelayChainSyncHeight 在中继链的智能合约存储区得到已同步过来的侧链高度
 func (this *SyncService) GetCurrentRelayChainSyncHeight(neoChainID uint64) (uint32, error) {
 	contractAddress := utils.HeaderSyncContractAddress
 	neoChainIDBytes, err := utils.GetUint64Bytes(neoChainID)
@@ -172,7 +174,6 @@ func (this *SyncService) syncHeaderToNeo(height uint32) error {
 		Headers: [][]byte{block.Header.ToArray()},
 	}
 
-	// need to change sdk here!!!
 	// example: SendRawTransaction来构造一笔InvocationTransaction
 	// create an InvocationTransaction
 	itx := tx.CreateInvocationTransaction()
