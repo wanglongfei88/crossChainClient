@@ -7,11 +7,13 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/ontio/crossChainClient/cmd"
-	"github.com/ontio/crossChainClient/common"
-	"github.com/ontio/crossChainClient/config"
-	"github.com/ontio/crossChainClient/log"
-	"github.com/ontio/crossChainClient/service"
+	"crossChainClient/cmd"
+	"crossChainClient/common"
+	"crossChainClient/config"
+	"crossChainClient/log"
+	"crossChainClient/service"
+
+	neoRpc "github.com/o3labs/neo-utils/neoutils/neorpc"
 	sdk "github.com/ontio/ontology-go-sdk"
 	"github.com/urfave/cli"
 )
@@ -62,10 +64,9 @@ func startSync(ctx *cli.Context) {
 	}
 
 	//create NEO RPC client
-	neoSdk := sdk.NewOntologySdk()
-	neoSdk.NewRpcClient().SetAddress(config.DefConfig.NeoJsonRpcAddress)
+	neoRpcClient := neoRpc.NewClient(config.DefConfig.NeoJsonRpcAddress)
 
-	syncService := service.NewSyncService(account, relaySdk, neoSdk)
+	syncService := service.NewSyncService(account, relaySdk, neoRpcClient)
 	syncService.Run()
 
 	waitToExit()
