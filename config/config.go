@@ -18,12 +18,15 @@ var DefConfig = NewConfig()
 //Config object used by ontology-instance
 type Config struct {
 	RelayJsonRpcAddress string
-	NeoJsonRpcAddress   string
 	RelayChainID        uint64
-	NeoChainID          uint64
 	WalletFile          string
-	GasPrice            uint64
-	GasLimit            uint64
+
+	NeoWalletFile     string
+	NeoJsonRpcAddress string
+	NeoChainID        uint64
+
+	GasPrice uint64
+	GasLimit uint64
 }
 
 //NewConfig retuen a TestConfig instance

@@ -1,9 +1,12 @@
 {
   "RelayJsonRpcAddress":"http://172.168.3.73:40336",
-  "NeoJsonRpcAddress":"TBD",
   "RelayChainID": 2,
-  "NeoChainID": 3,
   "WalletFile":"./wallet.dat",
+  
+  "NeoWalletFile":"TBD",
+  "NeoJsonRpcAddress":"TBD",
+  "NeoChainID": 3,
+
   "GasPrice":0,
   "GasLimit":200000
 }
