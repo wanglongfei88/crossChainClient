@@ -6,6 +6,7 @@ require (
 	github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e // indirect
 	github.com/cmars/basen v0.0.0-20150613233007-fe3947df716e // indirect
 	github.com/gorilla/websocket v1.4.1 // indirect
+	github.com/joeqian10/crossChainClient v0.0.0-20190910081505-8be24fceb05b
 	github.com/joeqian10/neo-utils v0.0.0-20190914022255-261d3db920db
 	github.com/o3labs/NEP9-go v0.0.0-20181019061420-a37be37708ad // indirect
 	github.com/o3labs/neo-utils v0.0.0-20190806035218-cbe201aea47a

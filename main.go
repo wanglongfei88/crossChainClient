@@ -13,7 +13,8 @@ import (
 	"crossChainClient/log"
 	"crossChainClient/service"
 
-	neoRpc "github.com/o3labs/neo-utils/neoutils/neorpc"
+	"github.com/joeqian10/neo-utils/neoutils"
+	neoRpc "github.com/joeqian10/neo-utils/neoutils/neorpc"
 	sdk "github.com/ontio/ontology-go-sdk"
 	"github.com/urfave/cli"
 )
@@ -63,10 +64,13 @@ func startSync(ctx *cli.Context) {
 		return
 	}
 
-	//create NEO RPC client
+	// create an NEO RPC client
 	neoRpcClient := neoRpc.NewClient(config.DefConfig.NeoJsonRpcAddress)
+	// create an NEO wallet
+	// hard coded the private key here, only for testing
+	neoWallet := neoutils.GenerateFromPrivateKey("")
 
-	syncService := service.NewSyncService(account, relaySdk, neoRpcClient)
+	syncService := service.NewSyncService(account, relaySdk, neoWallet, neoRpcClient)
 	syncService.Run()
 
 	waitToExit()

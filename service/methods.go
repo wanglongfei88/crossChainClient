@@ -5,8 +5,8 @@ import (
 	"time"
 	"math"
 
-	"github.com/ontio/crossChainClient/common"
-	"github.com/ontio/crossChainClient/log"
+	"github.com/joeqian10/crossChainClient/common"
+	"github.com/joeqian10/crossChainClient/log"
 
 	//"github.com/ontio/multi-chain/smartcontract/service/native/cross_chain_manager/inf"
 
@@ -163,7 +163,7 @@ func (this *SyncService) syncHeaderToNeo(height uint32) error {
 	}
 
 	contractAddress := utils.HeaderSyncContractAddress // can be hard coded
-	syncBlockHeader := "syncBlockHeader"               // can be hard coded
+	syncBlockHeader := "syncBlockHeader"               // method, can be hard coded
 	block, err := this.relaySdk.GetBlockByHeight(height)
 	if err != nil {
 		log.Errorf("[syncHeaderToNeo] this.mainSdk.GetBlockByHeight error:%s", err)
@@ -249,8 +249,9 @@ func (this *SyncService) waitForRelayBlock() {
 }
 
 func (this *SyncService) waitForNeoBlock() {
-	_, err := this.neoSdk.WaitForGenerateBlock(90*time.Second, 3)
+	time.Sleep(time.Duration(15)*time.Second)
+	/* _, err := this.neoSdk.WaitForGenerateBlock(90*time.Second, 3)
 	if err != nil {
 		log.Errorf("waitForNeoBlock error:%s", err)
-	}
+	} */
 }
